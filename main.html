@@ -5,9 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Atividade - Lógica e Programação - Robô no Labirinto</title>
     <style>
-        body { font-family: 'Courier New', Courier, monospace; background: #0084ff; color: #ffffff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        body { 
+            font-family: 'Courier New', Courier, monospace; 
+            background: #0084ff; 
+            color: #ffffff; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 20px;
+            min-height: 100vh;
+            margin: 0;
+            padding-bottom: 80px; 
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
         #stats { display: flex; gap: 30px; font-size: 20px; background: #0084ff; padding: 10px 30px; border-radius: 50px; border: 1px solid #ffffff; margin-bottom: 20px; }
-        #game-container { display: flex; gap: 30px; background: #0068ad; padding: 25px; border-radius: 15px; box-shadow: 0 0 20px rgba(0,255,150,0.1); }
+        #game-container { display: flex; gap: 30px; background: #0068ad; padding: 25px; border-radius: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.2); position: relative; }
         canvas { border: 3px solid #4e4e4e; background: #ffffff; border-radius: 5px; }
         #editor-container { width: 320px; display: flex; flex-direction: column; gap: 10px; }
         
@@ -22,15 +35,58 @@
         button:hover { background: #ff4d6d; transform: scale(1.02); }
         button:disabled { background: #555; opacity: 0.6; }
 
+        /* Estilo do Histórico Lateral */
+        #history-sidebar {
+            position: fixed;
+            right: -350px;
+            top: 0;
+            width: 300px;
+            height: 100%;
+            background: #00274b;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            transition: 0.3s;
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+            border-left: 4px solid #e94560;
+        }
+        #history-sidebar.open { right: 0; }
+        #toggle-history { position: fixed; right: 20px; top: 20px; z-index: 1001; background: #533483; }
+
+        .history-item {
+            background: #003a70;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #0084ff;
+        }
+        .history-item h4 { margin: 0 0 10px 0; color: #f1c40f; font-size: 14px; }
+        .history-item img { width: 100%; border: 1px solid #fff; border-radius: 4px; margin-bottom: 10px; }
+        .history-code { font-size: 11px; color: #00ff41; background: #001a33; padding: 5px; border-radius: 3px; max-height: 80px; overflow-y: auto; }
+
         .executing { background: rgba(255, 255, 255, 0.3); color: #fff; }
         .success-line { color: #00ff00; font-weight: bold; }
         .error-line { color: #ff0000; font-weight: bold; }
         
         #message { margin-top: 10px; height: 24px; text-align: center; font-weight: bold; color: #f1c40f; }
         .level-tag { color: #ffffff; margin-bottom: 5px; font-size: 14px; text-transform: uppercase; }
+
+        footer {
+            position: fixed; bottom: 0; left: 0; width: 100%; background: #ff00ff; color: white;
+            text-align: center; padding: 15px 0; font-size: 14px; border-top: 2px solid #ffffff;
+        }
     </style>
 </head>
 <body>
+
+    <button id="toggle-history">Ver Histórico</button>
+
+    <div id="history-sidebar">
+        <h3>Histórico de Níveis</h3>
+        <div id="history-list">
+            <p style="font-size: 12px; color: #aaa;">Complete um nível para salvar seu código aqui!</p>
+        </div>
+    </div>
 
     <div style="text-align: center">
         <h1>Ajude o Robô 🤖</h1>
@@ -46,11 +102,16 @@
         <canvas id="mazeCanvas" width="400" height="400"></canvas>
         
         <div id="editor-container">
-            <div id="code-editor" contenteditable="true" spellcheck="false" placeholder="Digite os comandos aqui..."></div>
+            <div id="code-editor" contenteditable="true" spellcheck="false" placeholder="Comandos: cima, baixo, esquerda, direita"></div>
             <button id="play-btn">Testar código ▶</button>
             <div id="message"></div>
         </div>
     </div>
+
+    <footer>
+        Desenvolvido por <strong>Ana Misque</strong> | 
+        Siga no Instagram: <a href="https://instagram.com/ana_misque" target="_blank">@ana_misque</a>
+    </footer>
 
     <script>
         const canvas = document.getElementById('mazeCanvas');
@@ -59,10 +120,14 @@
         const playBtn = document.getElementById('play-btn');
         const msgDisplay = document.getElementById('message');
         const levelDisplay = document.getElementById('level-info');
+        const historySidebar = document.getElementById('history-sidebar');
+        const historyList = document.getElementById('history-list');
+        const toggleHistoryBtn = document.getElementById('toggle-history');
 
         let dificuldade = 3;
         let cellSize, grid, robot, goal;
         let stars = 0, lives = 3;
+        let gameHistory = [];
 
         class Cell {
             constructor(r, c) {
@@ -71,6 +136,12 @@
                 this.visited = false;
             }
         }
+
+        // Toggle do Menu Lateral
+        toggleHistoryBtn.onclick = () => {
+            historySidebar.classList.toggle('open');
+            toggleHistoryBtn.innerText = historySidebar.classList.contains('open') ? "❌ Fechar" : "📜 Ver Histórico";
+        };
 
         function initGame() {
             cellSize = canvas.width / dificuldade;
@@ -109,10 +180,10 @@
             for (let r = 0; r < dificuldade; r++) {
                 for (let c = 0; c < dificuldade; c++) {
                     let x = c * cellSize, y = r * cellSize;
-                    if (grid[r][c].walls[0]) ctx.strokeRect(x, y, cellSize, 0.1);
-                    if (grid[r][c].walls[1]) ctx.strokeRect(x + cellSize, y, 0.1, cellSize);
-                    if (grid[r][c].walls[2]) ctx.strokeRect(x, y + cellSize, cellSize, 0.1);
-                    if (grid[r][c].walls[3]) ctx.strokeRect(x, y, 0.1, cellSize);
+                    if (grid[r][c].walls[0]) { ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+cellSize,y); ctx.stroke(); }
+                    if (grid[r][c].walls[1]) { ctx.beginPath(); ctx.moveTo(x+cellSize,y); ctx.lineTo(x+cellSize,y+cellSize); ctx.stroke(); }
+                    if (grid[r][c].walls[2]) { ctx.beginPath(); ctx.moveTo(x,y+cellSize); ctx.lineTo(x+cellSize,y+cellSize); ctx.stroke(); }
+                    if (grid[r][c].walls[3]) { ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+cellSize); ctx.stroke(); }
                 }
             }
             ctx.fillStyle = "#4cd137";
@@ -123,18 +194,41 @@
             ctx.fillText("🤖", robot.x * cellSize + cellSize/2, robot.y * cellSize + cellSize/2);
         }
 
+        function saveToHistory(codeText) {
+            const mazeImage = canvas.toDataURL(); // "Tira foto" do labirinto
+            const historyItem = {
+                level: `${dificuldade}x${dificuldade}`,
+                code: codeText,
+                image: mazeImage
+            };
+            gameHistory.unshift(historyItem); // Adiciona ao topo da lista
+            renderHistory();
+        }
+
+        function renderHistory() {
+            historyList.innerHTML = "";
+            gameHistory.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `
+                    <h4>Nível ${item.level}</h4>
+                    <img src="${item.image}" alt="Labirinto">
+                    <div class="history-code">${item.code}</div>
+                `;
+                historyList.appendChild(div);
+            });
+        }
+
         async function executeDebug() {
-            // REGEX MÁGICA: Extrai apenas as palavras chave, ignorando todo o resto
+            const rawText = editor.innerText;
             const regex = /(cima|baixo|esquerda|direita)/gi;
-            const textContent = editor.innerText;
-            const matches = textContent.match(regex) || [];
+            const matches = rawText.match(regex) || [];
             
             if (matches.length === 0) {
                 msgDisplay.innerText = "Nenhum comando reconhecido!";
                 return;
             }
 
-            // Reescreve o editor de forma limpa para o feedback visual
             editor.innerHTML = matches.map(m => `<span>${m.toLowerCase()}</span>`).join(' ');
             const spans = editor.querySelectorAll('span');
             
@@ -156,9 +250,7 @@
                 else if (cmd === "esquerda" && !cell.walls[3]) { robot.x--; moved = true; }
 
                 draw();
-                // Scroll automático do editor para seguir o robô
                 currentSpan.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                
                 await new Promise(r => setTimeout(r, 300));
 
                 if (moved) {
@@ -175,6 +267,7 @@
             }
 
             if (robot.x === goal.x && robot.y === goal.y) {
+                saveToHistory(rawText); // Salva antes de limpar
                 stars++;
                 dificuldade++;
                 msgDisplay.innerText = "CÓDIGO EFICIENTE! PRÓXIMO NÍVEL.";
