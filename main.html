@@ -75,6 +75,68 @@
             position: fixed; bottom: 0; left: 0; width: 100%; background: #ff00ff; color: white;
             text-align: center; padding: 15px 0; font-size: 14px; border-top: 2px solid #ffffff;
         }
+        /* Configuração para Celulares */
+        @media (max-width: 768px) {
+            #game-container {
+                flex-direction: column; /* Coloca o editor abaixo do canvas */
+                align-items: center;
+                gap: 20px;
+                padding: 15px;
+                width: 90%; /* Ajusta a largura para não vazar da tela */
+            }
+
+            canvas {
+                width: 100% !important; /* Faz o labirinto se ajustar à largura do celular */
+                height: auto !important;
+                max-width: 350px; /* Limite para não ficar gigante em tablets */
+            }
+
+            #editor-container {
+                width: 100%; /* Editor ocupa a largura total disponível */
+                max-width: 350px;
+            }
+
+            #stats {
+                gap: 15px;
+                font-size: 16px;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+
+            #toggle-history {
+                position: fixed;
+                right: 15px;
+                top: 15px;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%; /* Deixa o botão redondo */
+                font-size: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+                background: #533483;
+                border: 2px solid #ffffff;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+                color: transparent; /* Esconde o texto original */
+            }
+
+            /* Adiciona o ícone de relógio anti-horário ⟲ */
+            #toggle-history::before {
+                content: "⟲";
+                color: white;
+                position: absolute;
+                font-size: 28px;
+            }
+
+            /* Ajuste para quando o menu estiver aberto no celular */
+            #history-sidebar.open ~ #toggle-history::before {
+                content: "✕"; /* Muda para um X quando aberto */
+                font-size: 22px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -140,7 +202,10 @@
         // Toggle do Menu Lateral
         toggleHistoryBtn.onclick = () => {
             historySidebar.classList.toggle('open');
-            toggleHistoryBtn.innerText = historySidebar.classList.contains('open') ? "❌ Fechar" : "📜 Ver Histórico";
+            // Verifica se não está no celular antes de trocar o texto
+            if (window.innerWidth > 768) {
+                toggleHistoryBtn.innerText = historySidebar.classList.contains('open') ? "❌ Fechar" : "📜 Ver Histórico";
+            }
         };
 
         function initGame() {
