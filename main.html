@@ -229,12 +229,16 @@
                 return;
             }
 
+            // Prepara a visualização dos comandos
             editor.innerHTML = matches.map(m => `<span>${m.toLowerCase()}</span>`).join(' ');
             const spans = editor.querySelectorAll('span');
             
             playBtn.disabled = true;
-            robot = { x: 0, y: 0 }; 
+            robot = { x: 0, y: 0 }; // Garante que começa no início
+            draw();
             msgDisplay.innerText = "Processando lógica...";
+
+            let colidiu = false;
 
             for (let i = 0; i < matches.length; i++) {
                 let cmd = matches[i].toLowerCase();
@@ -244,6 +248,7 @@
                 let cell = grid[robot.y][robot.x];
                 let moved = false;
 
+                // Lógica de movimentação
                 if (cmd === "cima" && !cell.walls[0]) { robot.y--; moved = true; }
                 else if (cmd === "direita" && !cell.walls[1]) { robot.x++; moved = true; }
                 else if (cmd === "baixo" && !cell.walls[2]) { robot.y++; moved = true; }
@@ -255,19 +260,21 @@
 
                 if (moved) {
                     currentSpan.className = 'success-line';
+                    // Se chegar no objetivo durante o percurso, para a execução
+                    if (robot.x === goal.x && robot.y === goal.y) break;
                 } else {
+                    // ERRO: Bateu na parede
                     currentSpan.className = 'error-line';
                     lives--;
                     msgDisplay.innerText = `COLISÃO NO PASSO ${i+1}!`;
-                    updateUI();
-                    if(lives <= 0) setTimeout(resetGame, 600);
-                    else playBtn.disabled = false;
-                    return;
+                    colidiu = true;
+                    break; 
                 }
             }
 
-            if (robot.x === goal.x && robot.y === goal.y) {
-                saveToHistory(rawText); // Salva antes de limpar
+            // Verificação Final após o loop
+            if (!colidiu && robot.x === goal.x && robot.y === goal.y) {
+                saveToHistory(rawText);
                 stars++;
                 dificuldade++;
                 msgDisplay.innerText = "CÓDIGO EFICIENTE! PRÓXIMO NÍVEL.";
@@ -276,10 +283,20 @@
                     initGame();
                 }, 1200);
             } else {
-                lives--;
-                msgDisplay.innerText = "LÓGICA INCOMPLETA: Fim do código.";
+                // Se não colidiu mas acabou os comandos fora do alvo
+                if(!colidiu) {
+                    lives--;
+                    msgDisplay.innerText = "LÓGICA INCOMPLETA: Fim do código.";
+                }
+                
                 updateUI();
-                if(lives <= 0) setTimeout(resetGame, 600);
+                
+                // Aguarda um pouco para o usuário ver o erro e volta ao início
+                setTimeout(() => {
+                    robot = { x: 0, y: 0 };
+                    draw();
+                    if(lives <= 0) resetGame();
+                }, 800);
             }
             playBtn.disabled = false;
         }
